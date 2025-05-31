@@ -1,0 +1,90 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+*.whl
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+VENV/
+myenv/ # Add your specific venv name if different
+
+# IDE and editor configuration
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sublime-project
+*.sublime-workspace
+
+# Operating System generated files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Script Output - Adjust paths/names if your script's defaults change
+# Assuming the default output directory is 'Output' or similar
+Output/
+YOLO_Dataset/ # If you use a different default output directory name
+temp_trimmed_videos/
+
+# Specific output files if they are generated outside the main output directory
+# (Your script seems to place these inside the output_dir, so the above should cover them)
+# dataset.yaml
+# classes.txt
+
+# Large data files, including all videos and images
+# It's often good practice to not commit large raw video or CSV files to Git.
+# Instead, provide instructions on where to get them or use a small sample for testing.
+
+# Video files
+*.mp4
+*.avi
+*.mov
+*.wmv
+*.flv
+*.mkv
+*.webm
+
+# Image files
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.bmp
+*.tiff
+*.tif
+*.svg
+*.webp
+
+# Specific directories known to contain large media or test data
+DEMO/Test-Video/
+# DEMO/Test-CSV/ # Uncomment if your CSV test files are also very large and not needed in repo
+
+# CSV files (optional, uncomment if large)
+# *.csv
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# Log files
+*.log
+logs/
+
+# Coverage reports
+.coverage
+coverage.xml
+htmlcov/
