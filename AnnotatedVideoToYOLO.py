@@ -33,7 +33,7 @@ DEFAULT_MAX_GAP_SECONDS = 1.0
 DEFAULT_PADDING_SECONDS = 0.5
 # You can change the default tool if you prefer MoviePy now
 DEFAULT_TRIM_TOOL = 'ffmpeg' # or 'moviepy'
-DEFAULT_OUTPUT_BASE_DIR = r'\Users\edusa\Documents\Emanuel\Artigo\CSV-to-YOLO-VideoTrim\DEMO\Output'
+DEFAULT_OUTPUT_BASE_DIR = r'\your\path'
 DEFAULT_IMAGE_DIR_NAME = 'images'
 DEFAULT_LABEL_DIR_NAME = 'labels'
 DEFAULT_TRAIN_SUBDIR = 'train'
