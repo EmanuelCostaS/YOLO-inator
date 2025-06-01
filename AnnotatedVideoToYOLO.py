@@ -37,6 +37,7 @@ DEFAULT_OUTPUT_BASE_DIR = r'\Users\edusa\Documents\Emanuel\Artigo\CSV-to-YOLO-Vi
 DEFAULT_IMAGE_DIR_NAME = 'images'
 DEFAULT_LABEL_DIR_NAME = 'labels'
 DEFAULT_TRAIN_SUBDIR = 'train'
+DEFAULT_FRAME_SAMPLING_INTERVAL = 1 # Process every frame by default
 
 # --- Helper Functions ---
 
@@ -328,99 +329,99 @@ def trim_video_segment_moviepy(input_video_path, output_video_path, start_sec, e
             except Exception as e_close:
                 print(f"Warning: Error closing MoviePy video object: {e_close}")
                 
-def extract_frames_and_convert_yolo(trimmed_video_path, segment_original_start_sec,
-                                    original_annotations_df, video_fps_original,
+def extract_frames_and_convert_yolo(trimmed_video_path, segment_original_start_sec, 
+                                    original_annotations_df, video_fps_original, 
                                     class_map, img_width, img_height,
-                                    output_img_dir, output_label_dir, segment_idx):
-    """Extracts frames, converts annotations to YOLO, and saves them."""
+                                    output_img_dir, output_label_dir, segment_idx,
+                                    frame_sampling_interval): # <-- New argument received
+    """Extracts frames, converts annotations to YOLO, and saves them, with frame sampling."""
     cap = cv2.VideoCapture(trimmed_video_path)
     if not cap.isOpened():
         print(f"Error: Could not open trimmed video {trimmed_video_path}")
         return
 
-    frame_count_segment = 0
-    actual_trimmed_fps = cap.get(cv2.CAP_PROP_FPS) # Get FPS of the trimmed segment
-    if actual_trimmed_fps == 0: # Fallback if FPS is not readable
+    actual_trimmed_fps = cap.get(cv2.CAP_PROP_FPS)
+    if actual_trimmed_fps == 0:
         print(f"Warning: Could not read FPS from {trimmed_video_path}. Using original video FPS {video_fps_original}.")
         actual_trimmed_fps = video_fps_original
-    if actual_trimmed_fps == 0: # Further fallback if original FPS was also zero
+    if actual_trimmed_fps == 0:
          print(f"Error: FPS is zero for {trimmed_video_path}. Cannot process frames.")
          cap.release()
          return
+
+    frame_count_from_segment_start = 0 # Counts every frame read from the current trimmed segment
+    saved_frames_in_segment_count = 0  # Counts only frames that are actually saved
 
     while True:
         ret, frame = cap.read()
         if not ret:
             break
 
-        current_frame_time_in_segment = frame_count_segment / actual_trimmed_fps
-        original_video_time_sec = segment_original_start_sec + current_frame_time_in_segment
-        
-        time_tolerance = (1.0 / video_fps_original) / 2.0 if video_fps_original > 0 else 0.01 # Original FPS for tolerance matching
-        
-        # Corrected DataFrame filtering
-        frame_annotations = original_annotations_df[
-            (original_annotations_df['TimestampSec'] >= original_video_time_sec - time_tolerance) &
-            (original_annotations_df['TimestampSec'] <= original_video_time_sec + time_tolerance)
-        ]
-
-        if not frame_annotations.empty:
-            base_filename = f"segment_{segment_idx}_frame_{frame_count_segment:05d}"
-            img_path = os.path.join(output_img_dir, f"{base_filename}.jpg")
-            label_path = os.path.join(output_label_dir, f"{base_filename}.txt")
-
-            # Ensure img_width and img_height are from the current frame if re-encoding happened,
-            # but for -c copy, original video_width/height (img_width, img_height params) are fine.
-            # If frame dimensions can change, use: h, w = frame.shape[:2] instead of img_width, img_height for normalization.
-            # For simplicity, assuming -c copy preserves dimensions.
-            current_frame_height, current_frame_width = frame.shape[:2]
-
-
-            cv2.imwrite(img_path, frame)
+        # >>> Apply frame sampling logic <<<
+        if frame_count_from_segment_start % frame_sampling_interval == 0:
+            # This frame is selected by the sampling interval, now process it:
             
-            with open(label_path, 'w') as f_label:
-                for _, ann_row in frame_annotations.iterrows():
-                    # Correctly access Series elements by key
-                    species = ann_row['Species']
-                    if species not in class_map:
-                        print(f"Warning: Species '{species}' not in class_map. Skipping annotation for {base_filename}.")
-                        continue
-                    class_id = class_map[species]
-                    
-                    tl_x, tl_y, br_x, br_y = ann_row['TL_x'], ann_row['TL_y'], ann_row['BR_x'], ann_row['BR_y']
-                    
-                    # Clamp coordinates to actual current frame dimensions
-                    tl_x = max(0, tl_x)
-                    tl_y = max(0, tl_y)
-                    br_x = min(current_frame_width - 1, br_x) # Use actual frame width
-                    br_y = min(current_frame_height - 1, br_y) # Use actual frame height
+            current_frame_time_in_segment = frame_count_from_segment_start / actual_trimmed_fps
+            original_video_time_sec = segment_original_start_sec + current_frame_time_in_segment
+            
+            time_tolerance = (1.0 / video_fps_original) / 2.0 if video_fps_original > 0 else 0.01
+            
+            frame_annotations = original_annotations_df[
+                (original_annotations_df['TimestampSec'] >= original_video_time_sec - time_tolerance) &
+                (original_annotations_df['TimestampSec'] <= original_video_time_sec + time_tolerance)
+            ]
 
-                    if br_x <= tl_x or br_y <= tl_y:
-                        print(f"Warning: Invalid bbox coordinates after clamping for {base_filename}: ({tl_x},{tl_y},{br_x},{br_y}). Original: ({ann_row['TL_x']},{ann_row['TL_y']},{ann_row['BR_x']},{ann_row['BR_y']}). Skipping.")
-                        continue
+            if not frame_annotations.empty:
+                # Use a counter for saved frames for sequential filenames
+                base_filename = f"segment_{segment_idx}_savedframe_{saved_frames_in_segment_count:05d}"
+                img_path = os.path.join(output_img_dir, f"{base_filename}.jpg")
+                label_path = os.path.join(output_label_dir, f"{base_filename}.txt")
 
-                    bbox_width = br_x - tl_x
-                    bbox_height = br_y - tl_y
-                    x_center = tl_x + bbox_width / 2.0
-                    y_center = tl_y + bbox_height / 2.0
+                current_frame_height, current_frame_width = frame.shape[:2]
+                cv2.imwrite(img_path, frame)
+                
+                with open(label_path, 'w') as f_label:
+                    for _, ann_row in frame_annotations.iterrows():
+                        species = ann_row['Species']
+                        if species not in class_map:
+                            # print(f"Warning: Species '{species}' not in class_map. Skipping annotation for {base_filename}.") # Can be verbose
+                            continue
+                        class_id = class_map[species]
+                        
+                        tl_x, tl_y, br_x, br_y = ann_row['TL_x'], ann_row['TL_y'], ann_row['BR_x'], ann_row['BR_y']
+                        
+                        tl_x = max(0, tl_x)
+                        tl_y = max(0, tl_y)
+                        br_x = min(current_frame_width - 1, br_x)
+                        br_y = min(current_frame_height - 1, br_y)
 
-                    # Normalize using actual current frame dimensions
-                    x_center_norm = x_center / current_frame_width
-                    y_center_norm = y_center / current_frame_height
-                    width_norm = bbox_width / current_frame_width
-                    height_norm = bbox_height / current_frame_height
-                    
-                    # Ensure normalized values are within [0.0, 1.0]
-                    x_center_norm = max(0.0, min(1.0, x_center_norm))
-                    y_center_norm = max(0.0, min(1.0, y_center_norm))
-                    width_norm = max(0.0, min(1.0, width_norm))
-                    height_norm = max(0.0, min(1.0, height_norm))
+                        if br_x <= tl_x or br_y <= tl_y:
+                            # print(f"Warning: Invalid bbox for {base_filename}. Skipping.") # Can be verbose
+                            continue
 
-                    f_label.write(f"{class_id} {x_center_norm:.6f} {y_center_norm:.6f} {width_norm:.6f} {height_norm:.6f}\n")
-        frame_count_segment += 1
+                        bbox_width = br_x - tl_x
+                        bbox_height = br_y - tl_y
+                        x_center = tl_x + bbox_width / 2.0
+                        y_center = tl_y + bbox_height / 2.0
+
+                        x_center_norm = x_center / current_frame_width
+                        y_center_norm = y_center / current_frame_height
+                        width_norm = bbox_width / current_frame_width
+                        height_norm = bbox_height / current_frame_height
+                        
+                        x_center_norm = max(0.0, min(1.0, x_center_norm))
+                        y_center_norm = max(0.0, min(1.0, y_center_norm))
+                        width_norm = max(0.0, min(1.0, width_norm))
+                        height_norm = max(0.0, min(1.0, height_norm))
+
+                        f_label.write(f"{class_id} {x_center_norm:.6f} {y_center_norm:.6f} {width_norm:.6f} {height_norm:.6f}\n")
+                
+                saved_frames_in_segment_count += 1 # Increment counter for saved frames
+        
+        frame_count_from_segment_start += 1 # Increment for every frame read from segment
     
     cap.release()
-    print(f"Processed frames for {trimmed_video_path}")
+    print(f"Segment {segment_idx}: Read {frame_count_from_segment_start} frames, saved {saved_frames_in_segment_count} frames (sampling interval: {frame_sampling_interval}).")
 
 def create_class_mapping_and_files(all_species_names, output_dir):
     """Creates classes.txt and returns class_map and class_list."""
@@ -528,12 +529,29 @@ def main(args):
         else:
             print(f"Unsupported trim tool: {args.trim_tool}")
             continue
-        
+
         if success and os.path.exists(trimmed_video_path):
-            extract_frames_and_convert_yolo(trimmed_video_path, start_sec,
-                                            annotations_df, actual_fps, 
-                                            class_map, video_width, video_height,
-                                            images_dir, labels_dir, i)
+            # Validate and determine the effective frame_sampling_interval
+            effective_frame_sampling_interval = args.frame_sampling_interval
+            if effective_frame_sampling_interval <= 0:
+                print(f"Warning: --frame_sampling_interval was {args.frame_sampling_interval}, which is invalid. "
+                      "Defaulting to 1 (process all eligible frames in this segment).")
+                effective_frame_sampling_interval = 1
+            
+            print(f"Extracting frames from segment {i+1} with sampling interval: {effective_frame_sampling_interval}")
+            extract_frames_and_convert_yolo(
+                trimmed_video_path,           # path to the just-trimmed video segment
+                start_sec,                    # original start time of this segment in the source video
+                annotations_df,               # all annotations from the CSV
+                actual_fps,                   # FPS of the original video (used for time tolerance)
+                class_map,                    # mapping of species names to class IDs
+                video_width,                  # original video width for normalization reference
+                video_height,                 # original video height for normalization reference
+                images_dir,                   # output directory for images
+                labels_dir,                   # output directory for labels
+                i,                            # current segment index (for naming files)
+                effective_frame_sampling_interval # <-- THE NEW ARGUMENT IS PASSED HERE
+            )
         else:
             print(f"Skipping frame extraction for segment {i+1} due to trimming failure or file not found: {trimmed_video_path}")
             
@@ -566,6 +584,11 @@ if __name__ == "__main__":
     parser.add_argument("--image_dir_name", default=DEFAULT_IMAGE_DIR_NAME, help="Name of the image directory within the output.")
     parser.add_argument("--label_dir_name", default=DEFAULT_LABEL_DIR_NAME, help="Name of the label directory within the output.")
     parser.add_argument("--train_subdir", default=DEFAULT_TRAIN_SUBDIR, help="Name of the subdirectory for training data (e.g., 'train', 'val').")
+    parser.add_argument("--frame_sampling_interval", 
+                        type=int, 
+                        default=DEFAULT_FRAME_SAMPLING_INTERVAL,
+                        help="Process one frame every X frames within the identified segments. "
+                             "Default is 1 (process all eligible frames). Must be 1 or greater.")
 
     args = parser.parse_args()
     
