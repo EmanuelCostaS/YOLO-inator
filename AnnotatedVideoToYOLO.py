@@ -33,7 +33,7 @@ DEFAULT_MAX_GAP_SECONDS = 1.0
 DEFAULT_PADDING_SECONDS = 0.5
 # You can change the default tool if you prefer MoviePy now
 DEFAULT_TRIM_TOOL = 'ffmpeg' # or 'moviepy'
-DEFAULT_OUTPUT_BASE_DIR = r'\your\path'
+DEFAULT_OUTPUT_BASE_DIR = r'your\path'
 DEFAULT_IMAGE_DIR_NAME = 'images'
 DEFAULT_LABEL_DIR_NAME = 'labels'
 DEFAULT_TRAIN_SUBDIR = 'train'
@@ -424,16 +424,20 @@ def extract_frames_and_convert_yolo(trimmed_video_path, segment_original_start_s
     print(f"Segment {segment_idx}: Read {frame_count_from_segment_start} frames, saved {saved_frames_in_segment_count} frames (sampling interval: {frame_sampling_interval}).")
 
 def create_class_mapping_and_files(all_species_names, output_dir):
-    """Creates classes.txt and returns class_map and class_list."""
-    unique_species = sorted(list(set(all_species_names)))
-    class_map = {name: i for i, name in enumerate(unique_species)}
-    class_list = unique_species # This is already a list of unique names
+    """Creates classes.txt for a single 'Fish' class and returns class_map and class_list."""
+    class_list = ["Fish"]
+    class_map = {"Fish": 0}
+
+    # Ensure the output directory exists
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+        print(f"Created output directory: {output_dir}")
 
     classes_txt_path = os.path.join(output_dir, "classes.txt")
     with open(classes_txt_path, 'w') as f:
-        for species_name in class_list:
+        for species_name in class_list: # This will just be "Fish"
             f.write(f"{species_name}\n")
-    print(f"Created classes.txt at {classes_txt_path} with {len(class_list)} classes.")
+    print(f"Created classes.txt at {classes_txt_path} with 1 class: 'Fish'.")
     return class_map, class_list
 
 def create_dataset_yaml(output_dir, image_dir_name, label_dir_name, train_subdir, class_list, nc):
