@@ -333,7 +333,7 @@ def extract_frames_and_convert_yolo(trimmed_video_path, segment_original_start_s
                                     original_annotations_df, video_fps_original, 
                                     class_map, img_width, img_height,
                                     output_img_dir, output_label_dir, segment_idx,
-                                    frame_sampling_interval): # <-- New argument received
+                                    frame_sampling_interval):
     """Extracts frames, converts annotations to YOLO, and saves them, with frame sampling."""
     cap = cv2.VideoCapture(trimmed_video_path)
     if not cap.isOpened():
@@ -349,18 +349,15 @@ def extract_frames_and_convert_yolo(trimmed_video_path, segment_original_start_s
          cap.release()
          return
 
-    frame_count_from_segment_start = 0 # Counts every frame read from the current trimmed segment
-    saved_frames_in_segment_count = 0  # Counts only frames that are actually saved
+    frame_count_from_segment_start = 0 
+    saved_frames_in_segment_count = 0  
 
     while True:
         ret, frame = cap.read()
         if not ret:
             break
 
-        # >>> Apply frame sampling logic <<<
         if frame_count_from_segment_start % frame_sampling_interval == 0:
-            # This frame is selected by the sampling interval, now process it:
-            
             current_frame_time_in_segment = frame_count_from_segment_start / actual_trimmed_fps
             original_video_time_sec = segment_original_start_sec + current_frame_time_in_segment
             
@@ -372,7 +369,6 @@ def extract_frames_and_convert_yolo(trimmed_video_path, segment_original_start_s
             ]
 
             if not frame_annotations.empty:
-                # Use a counter for saved frames for sequential filenames
                 base_filename = f"segment_{segment_idx}_savedframe_{saved_frames_in_segment_count:05d}"
                 img_path = os.path.join(output_img_dir, f"{base_filename}.jpg")
                 label_path = os.path.join(output_label_dir, f"{base_filename}.txt")
@@ -382,11 +378,14 @@ def extract_frames_and_convert_yolo(trimmed_video_path, segment_original_start_s
                 
                 with open(label_path, 'w') as f_label:
                     for _, ann_row in frame_annotations.iterrows():
-                        species = ann_row['Species']
-                        if species not in class_map:
-                            # print(f"Warning: Species '{species}' not in class_map. Skipping annotation for {base_filename}.") # Can be verbose
-                            continue
-                        class_id = class_map[species]
+                        # MODIFICATION START: Always map to "Fish" class (ID 0)
+                        target_class_name = "Fish" 
+                        if target_class_name not in class_map:
+                            print(f"Error: The target class '{target_class_name}' is not defined in the class_map. "
+                                  f"Check 'create_class_mapping_and_files' function. Skipping annotation for {base_filename}.")
+                            continue 
+                        class_id = class_map[target_class_name]
+                        # MODIFICATION END
                         
                         tl_x, tl_y, br_x, br_y = ann_row['TL_x'], ann_row['TL_y'], ann_row['BR_x'], ann_row['BR_y']
                         
@@ -396,7 +395,6 @@ def extract_frames_and_convert_yolo(trimmed_video_path, segment_original_start_s
                         br_y = min(current_frame_height - 1, br_y)
 
                         if br_x <= tl_x or br_y <= tl_y:
-                            # print(f"Warning: Invalid bbox for {base_filename}. Skipping.") # Can be verbose
                             continue
 
                         bbox_width = br_x - tl_x
@@ -416,9 +414,9 @@ def extract_frames_and_convert_yolo(trimmed_video_path, segment_original_start_s
 
                         f_label.write(f"{class_id} {x_center_norm:.6f} {y_center_norm:.6f} {width_norm:.6f} {height_norm:.6f}\n")
                 
-                saved_frames_in_segment_count += 1 # Increment counter for saved frames
+                saved_frames_in_segment_count += 1 
         
-        frame_count_from_segment_start += 1 # Increment for every frame read from segment
+        frame_count_from_segment_start += 1 
     
     cap.release()
     print(f"Segment {segment_idx}: Read {frame_count_from_segment_start} frames, saved {saved_frames_in_segment_count} frames (sampling interval: {frame_sampling_interval}).")
