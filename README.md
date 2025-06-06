@@ -1,98 +1,103 @@
-﻿# YOLO-inator
+# Video to YOLO Annotation Conversion Tool
 
-## Video Annotation to YOLO Dataset Converter
+This project provides a set of Python scripts to convert video annotations from a specific CSV format into the YOLO (You Only Look Once) format required for object detection model training.  
+It includes a script for processing a single video and a batch-processing script to handle multiple video sessions efficiently.
 
-## Description
+The scripts are designed to be robust, handling common issues like frame rate mismatches between annotation files and source videos.
 
-This Python script, `AnnotatedVideoToYOLO.py`, processes a video file and a corresponding CSV annotation file to generate a dataset suitable for training YOLO (You Only Look Once) object detection models. It identifies segments in the video with annotations, trims these segments, extracts frames, and converts the annotations into the YOLO bounding box format.
+## Features
 
-A companion script, `batch_process_videos.py`, is provided to run `AnnotatedVideoToYOLO.py` on multiple video/CSV pairs organized in a specific directory structure.
+- **Direct Conversion**: Converts CSV annotations (bounding boxes) into YOLO-format `.txt` files.
+- **Frame Extraction**: Extracts the corresponding frames from the video and saves them as `.jpg` images.
+- **Batch Processing**: Automatically finds and processes multiple video sessions from a structured directory.
+- **Line-Based Sampling**: Allows you to create a smaller, evenly distributed dataset by sampling every Nth annotation line from your CSV file.
+- **FPS Mismatch Handling**: Automatically detects and corrects for discrepancies in frame rates between the annotation file and the source video, ensuring your labels align with the correct frames.
 
-## Features (`AnnotatedVideoToYOLO.py`)
+## Prerequisites
 
-* Parses CSV annotations containing timestamps, bounding boxes, and species/class labels.
-* Optionally extracts FPS (Frames Per Second) from CSV metadata or video file.
-* Identifies continuous segments of video with annotations based on a configurable time gap.
-* Adds padding to the start and end of identified segments.
-* Trims video segments using either FFmpeg or MoviePy.
-* Extracts frames from trimmed segments.
-* Converts bounding box annotations to YOLO format (class_id, x_center_norm, y_center_norm, width_norm, height_norm).
-* Generates `classes.txt` and `dataset.yaml` files required for YOLO training.
-* Organizes output into standard YOLO dataset directory structure (images and labels).
-* Allows frame sampling to process one frame every X frames within identified segments.
+You need Python 3 installed, along with the following libraries. You can install them using `pip`:
 
-## Requirements
+```bash
+pip install pandas opencv-python
+````
 
-* Python 3.7+
-* Libraries:
-    * pandas
-    * OpenCV-Python (`cv2`)
-    * MoviePy (optional, if using `'moviepy'` as trim tool)
-    * imageio-ffmpeg (optional, provides FFmpeg backend for MoviePy)
-* FFmpeg (required if using `'ffmpeg'` as trim tool, or as a backend for MoviePy). Must be installed and accessible in the system's PATH.
+## Folder Structure for Batch Processing
 
-## Installation
+To use the `batch_process_videos.py` script, your data must be organized in the following structure.
+The main directory (`Train/` in this example) should contain a separate subfolder for each video session.
 
-1.  **Clone the repository (if applicable) or download the scripts.**
+Inside each session folder, the script expects to find the video file and a subfolder (e.g., `auxiliary/`) that contains the corresponding CSV annotation file.
 
-2.  **Install Python dependencies:**
-    ```bash
-    pip install pandas opencv-python moviepy imageio-ffmpeg
-    ```
-    * If you only plan to use FFmpeg as the trim tool and not MoviePy, you can omit `moviepy` and `imageio-ffmpeg` from the install command, but ensure system FFmpeg is installed.
-
-3.  **Optional - Install FFmpeg (if not already installed):**
-    * Download FFmpeg from [ffmpeg.org](https://ffmpeg.org/download.html).
-    * Extract it and add the `bin` directory to your system's PATH environment variable.
+```
+/path/to/your/project/
+├── Train/
+│   ├── Session_1_Video/
+│   │   ├── session_1_video.mp4
+│   │   └── auxiliary/
+│   │       └── session_1_annotations.csv
+│   │
+│   ├── Session_2_Video/
+│   │   ├── session_2_video.mp4
+│   │   └── auxiliary/
+│   │       └── session_2_annotations.csv
+│   │
+│   └── Session_3_Video/
+│       ├── video_for_session_3.mov
+│       └── some_other_folder_name/
+│           └── annotations.csv
+│
+├── AnnotatedVideoToYOLO.py
+├── batch_process_videos.py
+└── README.md
+```
 
 ## Usage
 
-### Single Video Processing (`AnnotatedVideoToYOLO.py`)
+There are two ways to use this tool: processing a single video or batch processing multiple videos.
 
-The `AnnotatedVideoToYOLO.py` script is run from the command line for a single video and its corresponding CSV.
+### 1. Processing a Single Video
 
-#### Command-Line Arguments (`AnnotatedVideoToYOLO.py`)
+Use the `AnnotatedVideoToYOLO.py` script for converting a single video and its annotation file.
 
-* `--csv_file`: (Required) Path to the input CSV annotation file.
-* `--video_file`: (Required) Path to the input video file.
-* `--output_dir`: Base directory for the output YOLO dataset.
-    * Default in script: `/your/path`
-* `--fps_from_video`: If set, use FPS from the video file. Otherwise, it tries CSV metadata first, then the video file as a fallback. (Flag, defaults to False).
-* `--max_gap_seconds`: Maximum gap in seconds between detections to merge them into a single segment.
-    * Default: `1.0`
-* `--padding_seconds`: Seconds of padding to add to the start and end of each identified segment.
-    * Default: `0.5`
-* `--trim_tool`: Tool to use for trimming videos. Choices: `ffmpeg`, `moviepy`.
-    * Default: `ffmpeg`
-* `--image_dir_name`: Name of the image directory within the output.
-    * Default: `images`
-* `--label_dir_name`: Name of the label directory within the output.
-    * Default: `labels`
-* `--train_subdir`: Name of the subdirectory for training data (e.g., 'train', 'val').
-    * Default: `train`
-* `--frame_sampling_interval`: Process one frame every X frames within the identified segments.
-    * Default: `1`
+#### Example Command
 
-#### Expected Directory Structure
+This command processes a single video, samples one frame for every 10 lines in the CSV, and saves the output to a specified directory.
+
 ```bash
-Your_Project_Folder/
-├── AnnotatedVideoToYOLO.py
-├── batch_process_videos.py
-└── Fishtrack23/
-    └── Train/   <-- This is your --train_dir
-        ├── SessionFolder1/
-        │   ├── video1.mp4
-        │   └── Annotations_CSV/   <-- Subfolder with CSV
-        │       └── annotations1.csv
-        ├── SessionFolder2/
-        │   ├── movie2.avi
-        │   └── Data_Files/        <-- Subfolder with CSV
-        │       └── data2.csv
-        └── ... (more session folders)
+python AnnotatedVideoToYOLO.py \
+  --csv_file /path/to/your/annotations.csv \
+  --video_file /path/to/your/video.mp4 \
+  --output_dir /path/to/your/output_yolo_dataset \
+  --line_sampling_interval 10
 ```
-#### Example Command (`AnnotatedVideoToYOLO.py`)
 
-Example run:
+### 2. Batch Processing Multiple Videos
+
+Use the `batch_process_videos.py` script to automatically process all video sessions located in a parent directory.
+
+#### Example Command
+
+This command scans the `/path/to/FishTrack23/Train` directory, processes each session folder it finds, samples every 10th annotation line, and places all the resulting YOLO datasets into the `master_yolo_output/` directory.
 
 ```bash
-python AnnotatedVideoToYOLO.py --csv_file "/your/path.csv" --video_file "/your/path.mp4" --output_dir "/your/path" --frame_sampling_interval 5 --trim_tool moviepy
+python batch_process_videos.py \
+  --train_dir /path/to/FishTrack23/Train \
+  --master_output_dir /path/to/master_yolo_output \
+  --line_sampling_interval 10
+```
+
+## Script Descriptions
+
+* **AnnotatedVideoToYOLO.py**:
+  The core conversion script. It takes a single video and a CSV file as input, handles FPS correction, performs sampling, and generates the final YOLO-formatted images and label files.
+
+* **batch\_process\_videos.py**:
+  A wrapper script that automates the process for multiple videos. It iterates through a directory, finds matching video/CSV pairs, and calls `AnnotatedVideoToYOLO.py` for each one.
+
+## Important Note: Frame Rate (FPS) Mismatch
+
+This tool is designed to handle a common issue where annotations are created on a video with one frame rate (e.g., 10 FPS), but the source video file has a different frame rate (e.g., 30 FPS).
+
+The script will automatically detect this mismatch by comparing the FPS value in the CSV metadata with the FPS of the video file.
+If a discrepancy is found, it will adjust the frame numbers from the CSV to ensure the annotations are mapped to the correct moment in time in the source video, preventing empty or misaligned labels.
+
