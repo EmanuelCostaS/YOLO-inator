@@ -67,10 +67,7 @@ def draw_bounding_box(image_path, yolo_path, output_path="output.jpg"):
     cv2.destroyAllWindows()
 
 if __name__ == '__main__':
-    
-    if __name__ == '__main__':
         
-        image_file_path = r"C:\Users\edusa\Documents\Emanuel\Artigo\ReadBoundingBox\YOLO_Dataset\images\image_20250605_144850201.png"
-        yolo_file_path = r"C:\Users\edusa\Documents\Emanuel\Artigo\ReadBoundingBox\YOLO_Dataset\labels\image_20250605_144850201.txt"
-        
-        draw_bounding_box(image_file_path, yolo_file_path)
+    image_file_path = r"C:\Users\edusa\Documents\Emanuel\Artigo\ReadBoundingBox\YOLO_Dataset\images\image_20250605_144850201.png"
+    yolo_file_path = r"C:\Users\edusa\Documents\Emanuel\Artigo\ReadBoundingBox\YOLO_Dataset\labels\image_20250605_144850201.txt"      
+    draw_bounding_box(image_file_path, yolo_file_path)
