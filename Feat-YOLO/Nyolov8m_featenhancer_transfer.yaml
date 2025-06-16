@@ -1,0 +1,43 @@
+
+# YOLOv8m model with custom FeatEnHancer input layer
+# Parameters
+nc: 1  # number of classes
+depth_multiple: 0.67  # model depth multiple
+width_multiple: 0.75  # layer channel multiple
+
+# Backbone
+backbone:
+  # [from, number, module, args]
+  - [-1, 1, FeatEnHancer, [3]]       # Layer 0: Custom input enhancement. Takes 3 channels, outputs 3.
+
+  # The rest of this is the STANDARD yolov8m backbone.
+  # These layers will now load the pretrained weights correctly.
+  - [-1, 1, Conv, [64, 3, 2]]      # Layer 1 (was 0 in OG model)
+  - [-1, 2, C2f, [128, True]]      # Layer 2 (was 1 in OG model)
+  - [-1, 1, Conv, [128, 3, 2]]     # Layer 3 (was 2 in OG model)
+  - [-1, 4, C2f, [256, True]]      # Layer 4 (was 3 in OG model)
+  - [-1, 1, Conv, [256, 3, 2]]     # Layer 5 (was 4 in OG model)
+  - [-1, 4, C2f, [512, True]]      # Layer 6 (was 5 in OG model)
+  - [-1, 1, Conv, [512, 3, 2]]     # Layer 7 (was 6 in OG model)
+  - [-1, 2, C2f, [512, True]]      # Layer 8 (was 7 in OG model)
+  - [-1, 1, SPPF, [512, 5]]        # Layer 9 (was 8 in OG model)
+
+# Head
+head:
+  - [-1, 1, nn.Upsample, [None, 2, 'nearest']] # Layer 10
+  - [[-1, 6], 1, Concat, [1]]  # Concat with layer 6 (C2f)
+  - [-1, 2, C2f, [512]]        # Layer 12
+
+  - [-1, 1, nn.Upsample, [None, 2, 'nearest']] # Layer 13
+  - [[-1, 4], 1, Concat, [1]]  # Concat with layer 4 (C2f)
+  - [-1, 2, C2f, [256]]        # Layer 15
+
+  - [-1, 1, Conv, [256, 3, 2]] # Layer 16
+  - [[-1, 12], 1, Concat, [1]] # Concat with layer 12
+  - [-1, 2, C2f, [512]]        # Layer 18
+
+  - [-1, 1, Conv, [512, 3, 2]] # Layer 19
+  - [[-1, 9], 1, Concat, [1]]  # Concat with layer 9 (SPPF)
+  - [-1, 2, C2f, [512]]        # Layer 21
+
+  - [[15, 18, 21], 1, Detect, [nc]]  # Detect(P3, P4, P5)
