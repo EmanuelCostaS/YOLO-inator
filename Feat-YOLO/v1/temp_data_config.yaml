@@ -1,0 +1,5 @@
+train: /home/pdi/Downloads/Enhancement_detection/Datasets/FishTrack23/Training_data_split/TrainVal/train/image
+val: /home/pdi/Downloads/Enhancement_detection/Datasets/FishTrack23/Training_data_split/TrainVal/val/images
+nc: 1
+names:
+- Fish
